@@ -36,5 +36,5 @@ Outputs:
   # Find out more about other implicit resources you can reference within SAM
   # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
   AiSDKFunction:
-    Description: "Lambda Function ARN"
-    Value: !GetAtt AiSDKFunction.Arn
+    Description: "Lambda Function URL"
+    Value: !GetAtt AiSDKFunctionUrl.FunctionUrl

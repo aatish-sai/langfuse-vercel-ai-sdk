@@ -2,7 +2,8 @@
   "name": "langfuse-vercel-ai-sdk",
   "type": "module",
   "scripts": {
-    "build": "sam build"
+    "build": "sam build",
+    "sync": "sam sync --watch"
   },
   "devDependencies": {},
   "dependencies": {
