@@ -19,6 +19,9 @@ Resources:
       Runtime: nodejs24.x
       Architectures:
         - x86_64
+      FunctionUrlConfig:
+        AuthType: NONE
+        InvokeMode: RESPONSE_STREAM
     Metadata: # Manage esbuild properties
       BuildMethod: esbuild
       BuildProperties:
