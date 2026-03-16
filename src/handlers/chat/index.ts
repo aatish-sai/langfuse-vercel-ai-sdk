@@ -28,7 +28,6 @@ app.get("/stream", async (c) => {
 });
 
 app.get("/aws-lambda-info", (c) => {
-  console.log(c);
   return c.json({
     isBase64Encoded: c.env.event.isBase64Encoded,
     awsRequestId: c.env.context.awsRequestId,
