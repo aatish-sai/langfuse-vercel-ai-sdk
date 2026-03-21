@@ -5,10 +5,13 @@
     "build": "sam build",
     "sync": "sam sync --watch"
   },
-  "devDependencies": {},
   "dependencies": {
-    "esbuild": "^0.21.4",
+    "@ai-sdk/amazon-bedrock": "^4.0.82",
+    "@langfuse/otel": "^5.0.1",
+    "@langfuse/tracing": "^5.0.1",
+    "@opentelemetry/sdk-node": "^0.213.0",
     "ai": "^6.0.116",
+    "esbuild": "^0.21.4",
     "hono": "^4.12.8"
   }
 }
