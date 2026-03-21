@@ -14,6 +14,8 @@ Resources:
   AiSDKFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
+      MemorySize: 512
+      Timeout: 30
       CodeUri: src/handlers/chat
       Handler: index.lambdaHandler
       Runtime: nodejs24.x
@@ -22,6 +24,13 @@ Resources:
       FunctionUrlConfig:
         AuthType: NONE
         InvokeMode: RESPONSE_STREAM
+      Environment:
+        Variables:
+          LANGFUSE_SECRET_KEY: "{{resolve:secretsmanager:test/langfuse-vercel-ai-sdk:SecretString:langfuse_secret_key}}"
+          LANGFUSE_PUBLIC_KEY: "{{resolve:secretsmanager:test/langfuse-vercel-ai-sdk:SecretString:langfuse_public_key}}"
+          LANGFUSE_BASE_URL: "{{resolve:secretsmanager:test/langfuse-vercel-ai-sdk:SecretString:langfuse_base_url}}"
+      Policies: 
+        - arn:aws:iam::aws:policy/AmazonBedrockFullAccess
     Metadata: # Manage esbuild properties
       BuildMethod: esbuild
       BuildProperties:
