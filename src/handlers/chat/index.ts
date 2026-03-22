@@ -1,15 +1,17 @@
 import { Hono } from "hono";
 import { LambdaContext, LambdaEvent, streamHandle } from "hono/aws-lambda";
-import { stream } from "hono/streaming";
 import {
   customProvider,
   defaultSettingsMiddleware,
   streamText,
   wrapLanguageModel,
 } from "ai";
-import { NodeSDK } from "@opentelemetry/sdk-node";
+import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { LangfuseSpanProcessor } from "@langfuse/otel";
 import { bedrock } from "@ai-sdk/amazon-bedrock";
+import { LangfuseClient } from "@langfuse/client";
+import { context, trace } from "@opentelemetry/api";
+import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 
 type Bindings = {
   event: LambdaEvent;
@@ -18,11 +20,19 @@ type Bindings = {
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-const sdk = new NodeSDK({
-  spanProcessors: [new LangfuseSpanProcessor()],
+const langfuseSpanProcessor = new LangfuseSpanProcessor();
+
+const traceProvider = new NodeTracerProvider({
+  spanProcessors: [langfuseSpanProcessor],
 });
 
-sdk.start();
+traceProvider.register({
+  contextManager: new AsyncLocalStorageContextManager(),
+});
+
+const tracer = trace.getTracer("default");
+
+const langfuse = new LangfuseClient();
 
 const providers = customProvider({
   languageModels: {
@@ -52,20 +62,57 @@ app.get("/healthcheck", (c) => {
 });
 
 app.get("/stream", async (c) => {
-  const result = streamText({
-    model: providers.languageModel("amazon-nova-2-lite"),
-    prompt: "This is a test prompt. Answer with your capabilities",
-    experimental_telemetry: {
-      isEnabled: true,
-    },
-  });
+  const span = tracer.startSpan("chat-message");
 
-  return stream(c, async (stream) => {
-    for await (const textPart of result.textStream) {
-      await stream.write(textPart);
+  const ctx = trace.setSpan(context.active(), span);
+  return context.with(ctx, async () => {
+    try {
+      const prompt = await langfuse.prompt.get("default");
+
+      const compiledPrompt = prompt.compile();
+
+      span.setAttribute("input", compiledPrompt);
+      span.setAttribute("gen_ai.prompt", compiledPrompt);
+
+      const result = streamText({
+        model: providers.languageModel("amazon-nova-2-lite"),
+        prompt: compiledPrompt,
+        // prompt: "This is a test prompt. Answer with your capabilities",
+        experimental_telemetry: {
+          isEnabled: true,
+          functionId: "chat-message",
+          metadata: {
+            traceName: "chat-message",
+            tags: ["production"],
+            userId: "test-user-id",
+            sessionId: "test-session-id",
+          },
+        },
+        onFinish: async (result) => {
+          try {
+            span.setAttribute("output", result.text);
+            span.setAttribute("gen_ai.completion", result.text);
+          } finally {
+            span.end();
+            await langfuseSpanProcessor.forceFlush();
+          }
+        },
+        onError: async (error) => {
+          try {
+            span.setAttribute("error", true);
+          } finally {
+            span.end();
+            await langfuseSpanProcessor.forceFlush();
+          }
+        },
+      });
+
+      return result.toUIMessageStreamResponse();
+    } catch (err) {
+      span.end();
+      await langfuseSpanProcessor.forceFlush();
+      throw err;
     }
-
-    await sdk.shutdown();
   });
 });
 
